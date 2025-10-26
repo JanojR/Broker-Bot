@@ -1,12 +1,13 @@
+import twilio from 'twilio';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
 /**
- * Log email (not actually sent)
+ * Send email (simulated for demo)
  */
 export async function sendEmail(to: string, subject: string, body: string, fromName = 'Contractr.AI') {
-  console.log('📧 EMAIL (not sent in demo mode)');
+  console.log('📧 EMAIL (simulated)');
   console.log('To:', to);
   console.log('Subject:', subject);
   console.log('Body:', body);
@@ -14,13 +15,40 @@ export async function sendEmail(to: string, subject: string, body: string, fromN
 }
 
 /**
- * Log SMS (not actually sent)
+ * Send SMS via Twilio (REAL SMS)
  */
 export async function sendSMS(to: string, body: string) {
-  console.log('💬 SMS (not sent in demo mode)');
-  console.log('To:', to);
-  console.log('Body:', body);
-  return { success: true, simulated: true };
+  const accountSid = process.env.TWILIO_ACCOUNT_SID;
+  const authToken = process.env.TWILIO_AUTH_TOKEN;
+  const fromNumber = process.env.TWILIO_PHONE_NUMBER;
+  
+  if (!accountSid || !authToken || !fromNumber) {
+    console.log('💬 SMS (Twilio not configured - simulated)');
+    console.log('To:', to);
+    console.log('Body:', body);
+    return { success: true, simulated: true };
+  }
+  
+  try {
+    const client = twilio(accountSid, authToken);
+    
+    const message = await client.messages.create({
+      to,
+      from: fromNumber,
+      body: `${body}\n\n[Contractr.AI Demo - Reply to opt out]`,
+    });
+    
+    console.log(`✅ REAL SMS SENT to ${to} (SID: ${message.sid})`);
+    console.log('Message:', body);
+    
+    return { success: true, sid: message.sid };
+  } catch (error: any) {
+    console.error('❌ Failed to send SMS:', error.message);
+    console.log('💬 FALLBACK: SMS (simulated)');
+    console.log('To:', to);
+    console.log('Body:', body);
+    return { success: true, simulated: true, error: error.message };
+  }
 }
 
 /**
