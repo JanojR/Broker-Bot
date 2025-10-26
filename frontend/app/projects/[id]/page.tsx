@@ -34,12 +34,20 @@ export default function ProjectDetailPage() {
   };
 
   const handleStartSourcing = async () => {
+    if (!confirm('This will search for contractors. Continue?')) return;
+    
+    setLoading(true);
     try {
       await axios.post(`http://localhost:3001/api/v1/projects/${id}/sourcing/start`);
-      alert('Sourcing started! Check back in a few minutes.');
-      setTimeout(fetchProject, 2000);
-    } catch (error) {
+      // Fetch updated project data
+      await fetchProject();
+      alert('Sourcing completed! Found candidates.');
+    } catch (error: any) {
       console.error('Failed to start sourcing:', error);
+      alert(`Error: ${error.response?.data?.error || 'Failed to start sourcing'}`);
+      fetchProject(); // Reload regardless
+    } finally {
+      setLoading(false);
     }
   };
 

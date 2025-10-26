@@ -89,12 +89,25 @@ router.post('/:id/sourcing/start', async (req, res) => {
       data: { status: 'sourcing' },
     });
     
-    // Process sourcing in background (in production, use a queue)
-    processSourcing(req.params.id).catch(console.error);
+    // Process sourcing synchronously for immediate results
+    console.log(`Starting sourcing for project ${req.params.id}`);
+    await processSourcing(req.params.id);
+    console.log(`Sourcing completed for project ${req.params.id}`);
     
-    res.json({ message: 'Sourcing started', status: 'processing' });
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to start sourcing' });
+    // Update status to awaiting approval
+    await prisma.project.update({
+      where: { id: req.params.id },
+      data: { status: 'awaiting_approval' },
+    });
+    
+    res.json({ message: 'Sourcing completed', status: 'awaiting_approval' });
+  } catch (error: any) {
+    console.error('Sourcing error:', error);
+    await prisma.project.update({
+      where: { id: req.params.id },
+      data: { status: 'draft' },
+    });
+    res.status(500).json({ error: error.message || 'Failed to start sourcing' });
   }
 });
 

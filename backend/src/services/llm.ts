@@ -27,7 +27,9 @@ export async function generateCounterOffer(
         messages: [{ role: 'user', content: prompt }],
       });
       
-      return message.content[0].text || 'Unable to generate message';
+      // Extract text from Claude response
+      const textContent = message.content.find(block => block.type === 'text');
+      return textContent ? textContent.text : 'Unable to generate message';
     } catch (error) {
       console.error('Claude API error:', error);
       return generateFallbackMessage(strategy);

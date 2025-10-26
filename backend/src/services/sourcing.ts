@@ -66,9 +66,12 @@ export async function extractContacts(url: string): Promise<ContactInfo> {
  */
 export async function searchContractors(query: string, location: string): Promise<any[]> {
   const apiKey = process.env.PARALLEL_API_KEY;
+  const searchQuery = `${query} near ${location}`;
+  console.log(`🔍 Searching for contractors: "${searchQuery}"`);
+  
   if (!apiKey) {
-    console.warn('PARALLEL_API_KEY not set, using mock data');
-    return getMockContractors();
+    console.warn('⚠️  PARALLEL_API_KEY not set, using mock data');
+    return getMockContractors(query, location);
   }
   
   try {
@@ -98,24 +101,30 @@ export async function searchContractors(query: string, location: string): Promis
 /**
  * Mock contractors for demo (when API not available)
  */
-function getMockContractors() {
-  return [
+function getMockContractors(query: string = '', location: string = '') {
+  // Generate more realistic mock contractors based on query
+  const serviceType = query.toLowerCase();
+  const city = location.split(',')[0] || location;
+  
+  const contractors = [
     {
-      name: 'ABC Cleaning Services',
-      website: 'https://example.com/abc-cleaning',
-      snippet: 'Professional house cleaning services in San Jose',
+      name: `${city} ${serviceType} Pro`,
+      website: `https://${city.toLowerCase().replace(' ', '')}-${serviceType.replace(' ', '-')}.com`,
+      snippet: `Professional ${serviceType} services in ${city}. Licensed and insured.`,
     },
     {
-      name: 'Sparkle Clean Co.',
-      website: 'https://example.com/sparkle-clean',
-      snippet: 'Residential and commercial cleaning',
+      name: `Elite ${serviceType.charAt(0).toUpperCase() + serviceType.slice(1)} Services`,
+      website: `https://elite-${serviceType.replace(' ', '-')}-${city.toLowerCase().replace(' ', '-')}.com`,
+      snippet: `Top-rated ${serviceType} company serving ${city}. Fast response time.`,
     },
     {
-      name: 'Green Clean Solutions',
-      website: 'https://example.com/green-clean',
-      snippet: 'Eco-friendly cleaning services',
+      name: `${city} Local ${serviceType.charAt(0).toUpperCase() + serviceType.slice(1)}`,
+      website: `https://local-${serviceType.replace(' ', '-')}.com`,
+      snippet: `Local ${serviceType} experts. Competitive pricing. 24/7 availability.`,
     },
   ];
+  
+  return contractors;
 }
 
 /**
@@ -133,19 +142,20 @@ export async function processSourcing(projectId: string) {
   for (const result of results.slice(0, 10)) {
     const { emails, phones } = await extractContacts(result.website);
     
-    if (emails.length > 0 || phones.length > 0) {
-      const provider = await prisma.provider.create({
-        data: {
-          projectId,
-          name: result.name,
-          website: result.website,
-          serviceAreaText: result.snippet,
-          score: 0.7,
-          evidenceUrls: [result.website],
-        },
-      });
-      
-      // Add contact methods
+    // Create provider even if no contacts found (will use website as contact method)
+    const provider = await prisma.provider.create({
+      data: {
+        projectId,
+        name: result.name,
+        website: result.website,
+        serviceAreaText: result.snippet,
+        score: 0.7,
+        evidenceUrls: [result.website],
+      },
+    });
+    
+    // Add contact methods (or website as fallback)
+    if (emails.length > 0) {
       for (const email of emails) {
         await prisma.contactMethod.create({
           data: {
@@ -157,7 +167,21 @@ export async function processSourcing(projectId: string) {
           },
         });
       }
-      
+    } else {
+      // Add website as contact method if no email found
+      await prisma.contactMethod.create({
+        data: {
+          providerId: provider.id,
+          kind: 'email',
+          value: `contact@${result.website.replace('https://', '').replace('http://', '').replace('www.', '')}`,
+          sourceUrl: result.website,
+          confidence: 0.3,
+          allowed: false, // Mark as not verified
+        },
+      });
+    }
+    
+    if (phones.length > 0) {
       for (const phone of phones) {
         await prisma.contactMethod.create({
           data: {
