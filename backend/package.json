@@ -23,6 +23,7 @@
     "express": "^4.18.2",
     "ioredis": "^5.3.2",
     "playwright": "^1.41.0",
+    "serpapi": "^2.2.1",
     "zod": "^3.22.4"
   },
   "devDependencies": {
