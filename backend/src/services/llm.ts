@@ -1,7 +1,8 @@
-import OpenAI from 'openai';
+import Anthropic from '@anthropic-ai/sdk';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+// Claude client (configured but not auto-called to save API usage)
+const anthropic = new Anthropic({
+  apiKey: process.env.CLAUDE_API_KEY,
 });
 
 /**
@@ -11,61 +12,53 @@ export async function generateCounterOffer(
   providerName: string,
   currentQuote: any,
   competitorQuote: any,
-  strategy: 'price_match' | 'bundle' | 'off_peak' | 'fee_waiver'
+  strategy: 'price_match' | 'bundle' | 'off_peak' | 'fee_waiver',
+  useClaude: boolean = false
 ): Promise<string> {
   const prompt = buildNegotiationPrompt(providerName, currentQuote, competitorQuote, strategy);
   
-  try {
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4',
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0.7,
-      max_tokens: 500,
-    });
-    
-    return completion.choices[0]?.message?.content || 'Unable to generate message';
-  } catch (error) {
-    console.error('LLM error:', error);
-    return generateFallbackMessage(strategy);
+  // Only use Claude if explicitly requested (to save API calls)
+  if (useClaude && process.env.CLAUDE_API_KEY) {
+    try {
+      const message = await anthropic.messages.create({
+        model: 'claude-3-5-sonnet-20241022',
+        max_tokens: 500,
+        temperature: 0.7,
+        messages: [{ role: 'user', content: prompt }],
+      });
+      
+      return message.content[0].text || 'Unable to generate message';
+    } catch (error) {
+      console.error('Claude API error:', error);
+      return generateFallbackMessage(strategy);
+    }
   }
+  
+  // Return fallback message (saves API calls)
+  return generateFallbackMessage(strategy);
 }
 
 /**
  * Parse quote from response
  */
-export async function parseQuote(body: string): Promise<any> {
-  const prompt = `Extract quote information from this email/SMS:
-
-${body}
-
-Return a JSON object with:
-{
-  "totalPrice": number or null,
-  "priceType": "fixed" | "hourly" | "estimate",
-  "leadTime": number (days) or null,
-  "warranty": string or null,
-  "items": array of {desc, quantity, price},
-  "fees": array of {type, amount},
-  "discounts": number or null,
-  "notes": string or null,
-  "validUntil": string or null
-}
-
-If information is missing or unclear, use null.`;
-
-  try {
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4',
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0.3,
-      response_format: { type: 'json_object' },
-    });
-    
-    return JSON.parse(completion.choices[0]?.message?.content || '{}');
-  } catch (error) {
-    console.error('Parse error:', error);
-    return {};
-  }
+export async function parseQuote(body: string, useClaude: boolean = false): Promise<any> {
+  // For now, just parse with regex to avoid API calls
+  // Claude parsing can be enabled later
+  const totalPriceMatch = body.match(/\$\s*(\d+(?:\.\d{2})?)/);
+  const totalPrice = totalPriceMatch ? parseFloat(totalPriceMatch[1]) : null;
+  
+  // Simple extraction without API calls
+  return {
+    totalPrice,
+    priceType: body.includes('hourly') || body.includes('hr') ? 'hourly' : 'fixed',
+    leadTime: null,
+    warranty: null,
+    items: [],
+    fees: [],
+    discounts: null,
+    notes: body.substring(0, 200),
+    validUntil: null,
+  };
 }
 
 /**

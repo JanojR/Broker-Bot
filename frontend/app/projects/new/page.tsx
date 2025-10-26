@@ -26,7 +26,6 @@ export default function NewProjectPage() {
     
     try {
       const res = await axios.post('http://localhost:3001/api/v1/projects', {
-        userId: 'demo-user-1', // TODO: Get from auth
         ...formData,
         budgetMax: formData.budgetMax ? parseFloat(formData.budgetMax) : null,
       });

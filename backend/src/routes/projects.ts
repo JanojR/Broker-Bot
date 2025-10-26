@@ -8,13 +8,33 @@ const prisma = new PrismaClient();
 // Create project
 router.post('/', async (req, res) => {
   try {
+    // Create or get demo user
+    const user = await prisma.user.upsert({
+      where: { email: 'demo@contractr.ai' },
+      update: {},
+      create: {
+        email: 'demo@contractr.ai',
+        name: 'Demo User',
+      },
+    });
+
     const project = await prisma.project.create({
-      data: req.body,
+      data: {
+        ...req.body,
+        userId: user.id,
+        mustHaves: req.body.mustHaves || [],
+        niceToHaves: req.body.niceToHaves || [],
+        seedContractors: req.body.seedContractors || [],
+        seedContacts: req.body.seedContacts || [],
+        channelsAllowed: req.body.channelsAllowed || ['email'],
+        autopilot: req.body.autopilot !== undefined ? req.body.autopilot : true,
+      },
       include: { providers: true },
     });
     res.json(project);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to create project' });
+  } catch (error: any) {
+    console.error('Project creation error:', error);
+    res.status(500).json({ error: error.message || 'Failed to create project' });
   }
 });
 
