@@ -91,7 +91,7 @@ router.post('/:id/sourcing/start', async (req, res) => {
     
     // Process sourcing synchronously for immediate results
     console.log(`Starting sourcing for project ${req.params.id}`);
-    await processSourcing(req.params.id);
+    const result = await processSourcing(req.params.id);
     console.log(`Sourcing completed for project ${req.params.id}`);
     
     // Update status to awaiting approval
@@ -100,7 +100,29 @@ router.post('/:id/sourcing/start', async (req, res) => {
       data: { status: 'awaiting_approval' },
     });
     
-    res.json({ message: 'Sourcing completed', status: 'awaiting_approval' });
+    // Auto-start outreach to demo contractors
+    if (result.autoOutreach) {
+      console.log('Starting automated outreach to demo contractors...');
+      const { initiateOutreach } = require('../services/messaging');
+      const providers = await prisma.provider.findMany({
+        where: { 
+          projectId: req.params.id,
+          notes: 'Demo contractor for negotiation testing',
+        },
+        include: { contacts: true },
+      });
+      
+      for (const provider of providers) {
+        try {
+          await initiateOutreach(provider.id, req.params.id);
+          console.log(`✅ Sent initial outreach to ${provider.name}`);
+        } catch (err: any) {
+          console.error(`Failed to outreach ${provider.name}:`, err.message);
+        }
+      }
+    }
+    
+    res.json({ message: 'Sourcing completed with outreach', status: 'awaiting_approval' });
   } catch (error: any) {
     console.error('Sourcing error:', error);
     await prisma.project.update({

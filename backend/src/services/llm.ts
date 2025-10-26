@@ -13,11 +13,11 @@ export async function generateCounterOffer(
   currentQuote: any,
   competitorQuote: any,
   strategy: 'price_match' | 'bundle' | 'off_peak' | 'fee_waiver',
-  useClaude: boolean = false
+  useClaude: boolean = true  // ENABLED by default now
 ): Promise<string> {
   const prompt = buildNegotiationPrompt(providerName, currentQuote, competitorQuote, strategy);
   
-  // Only use Claude if explicitly requested (to save API calls)
+  // Use Claude (enabled by default for demo)
   if (useClaude && process.env.CLAUDE_API_KEY) {
     try {
       const message = await anthropic.messages.create({
@@ -36,7 +36,7 @@ export async function generateCounterOffer(
     }
   }
   
-  // Return fallback message (saves API calls)
+  // Return fallback message if Claude unavailable
   return generateFallbackMessage(strategy);
 }
 
