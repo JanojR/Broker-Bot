@@ -52,22 +52,24 @@ export default function ProjectDetailPage() {
   };
 
   const handleStartOutreach = async () => {
-    if (!confirm('This will contact all contractors for quotes. Continue?')) return;
+    if (!confirm('This will contact demo contractors (8586105361 & 3108949312) for quotes. Continue?')) return;
     
     setLoading(true);
     try {
-      // Trigger outreach for all providers
+      // Trigger outreach for ALL providers (will only contact demo ones with SMS)
+      let contacted = 0;
       for (const provider of project.providers) {
         try {
           await axios.post(`http://localhost:3001/api/v1/providers/${provider.id}/outreach/init`);
           console.log(`Contacted ${provider.name}`);
+          contacted++;
         } catch (err: any) {
           console.error(`Failed to contact ${provider.name}:`, err);
         }
       }
       
       await fetchProject();
-      alert('Contacted all contractors! Check conversations.');
+      alert(`Contacted ${contacted} contractors! Check your phones (8586105361 & 3108949312).`);
     } catch (error: any) {
       console.error('Outreach error:', error);
       alert('Failed to start outreach');

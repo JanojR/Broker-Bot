@@ -172,8 +172,8 @@ export async function processSourcing(projectId: string) {
   const query = `${project.type} ${project.city}`;
   const results = await searchContractors(query, project.address);
   
-  // Enrich each result
-  for (const result of results.slice(0, 8)) { // Reduced to 8 to make room for demo contractors
+  // Enrich each result (show all contractors on page)
+  for (const result of results.slice(0, 8)) {
     const { emails, phones } = await extractContacts(result.website);
     
     // Create provider even if no contacts found (will use website as contact method)
@@ -188,7 +188,7 @@ export async function processSourcing(projectId: string) {
       },
     });
     
-    // Add contact methods (or website as fallback)
+    // Add contact methods (disabled for real contractors - won't be contacted)
     if (emails.length > 0) {
       for (const email of emails) {
         await prisma.contactMethod.create({
@@ -198,21 +198,10 @@ export async function processSourcing(projectId: string) {
             value: email,
             sourceUrl: result.website,
             confidence: 0.8,
+            allowed: false, // Disabled - won't contact real contractors
           },
         });
       }
-    } else {
-      // Add website as contact method if no email found
-      await prisma.contactMethod.create({
-        data: {
-          providerId: provider.id,
-          kind: 'email',
-          value: `contact@${result.website.replace('https://', '').replace('http://', '').replace('www.', '')}`,
-          sourceUrl: result.website,
-          confidence: 0.3,
-          allowed: false, // Mark as not verified
-        },
-      });
     }
     
     if (phones.length > 0) {
@@ -224,13 +213,14 @@ export async function processSourcing(projectId: string) {
             value: phone,
             sourceUrl: result.website,
             confidence: 0.7,
+            allowed: false, // Disabled - won't contact real contractors
           },
         });
       }
     }
   }
   
-  // Add demo contractors with provided phone numbers
+  // Add demo contractors with provided phone numbers (ONLY these will be contacted)
   console.log('📞 Adding demo contractors with phone numbers...');
   const demoContractors = [
     {

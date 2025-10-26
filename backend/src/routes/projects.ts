@@ -100,9 +100,9 @@ router.post('/:id/sourcing/start', async (req, res) => {
       data: { status: 'awaiting_approval' },
     });
     
-    // Auto-start outreach to demo contractors
+    // Auto-start outreach to demo contractors ONLY
     if (result.autoOutreach) {
-      console.log('Starting automated outreach to demo contractors...');
+      console.log('Starting automated outreach to demo contractors ONLY...');
       const { initiateOutreach } = require('../services/messaging');
       const providers = await prisma.provider.findMany({
         where: { 
@@ -112,10 +112,12 @@ router.post('/:id/sourcing/start', async (req, res) => {
         include: { contacts: true },
       });
       
+      console.log(`Found ${providers.length} demo contractors to contact`);
+      
       for (const provider of providers) {
         try {
           await initiateOutreach(provider.id, req.params.id);
-          console.log(`✅ Sent initial outreach to ${provider.name}`);
+          console.log(`✅ Sent initial SMS to ${provider.name}`);
         } catch (err: any) {
           console.error(`Failed to outreach ${provider.name}:`, err.message);
         }
