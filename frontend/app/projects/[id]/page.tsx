@@ -51,6 +51,31 @@ export default function ProjectDetailPage() {
     }
   };
 
+  const handleStartOutreach = async () => {
+    if (!confirm('This will contact all contractors for quotes. Continue?')) return;
+    
+    setLoading(true);
+    try {
+      // Trigger outreach for all providers
+      for (const provider of project.providers) {
+        try {
+          await axios.post(`http://localhost:3001/api/v1/providers/${provider.id}/outreach/init`);
+          console.log(`Contacted ${provider.name}`);
+        } catch (err: any) {
+          console.error(`Failed to contact ${provider.name}:`, err);
+        }
+      }
+      
+      await fetchProject();
+      alert('Contacted all contractors! Check conversations.');
+    } catch (error: any) {
+      console.error('Outreach error:', error);
+      alert('Failed to start outreach');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (loading) {
     return <div className="p-8 text-center">Loading...</div>;
   }
@@ -67,12 +92,22 @@ export default function ProjectDetailPage() {
             <h1 className="text-3xl font-bold">{project.title}</h1>
             <p className="text-gray-600 mt-1">Status: {project.status}</p>
           </div>
-          <button
-            onClick={handleStartSourcing}
-            className="btn btn-primary"
-          >
-            Start Sourcing
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={handleStartSourcing}
+              className="btn btn-primary"
+            >
+              Start Sourcing
+            </button>
+            {project.status === 'awaiting_approval' && project.providers.length > 0 && (
+              <button
+                onClick={handleStartOutreach}
+                className="btn btn-primary"
+              >
+                Start Negotiations
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="card mb-6">
