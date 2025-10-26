@@ -68,35 +68,66 @@ export async function searchContractors(query: string, location: string): Promis
   const apiKey = process.env.SERP_API_KEY;
   const searchQuery = `${query} ${location}`;
   console.log(`🔍 Searching Google for: "${searchQuery}"`);
+  console.log(`API Key exists: ${!!apiKey}`);
   
-  if (!apiKey) {
+  if (!apiKey || apiKey === 'your-serp-api-key') {
     console.warn('⚠️  SERP_API_KEY not set, using mock data with improved scraping');
     const mockResults = getMockContractors(query, location);
-    // Try to actually scrape the mock websites to demonstrate the flow
     return mockResults;
   }
   
   try {
+    console.log(`🔗 Calling SerpAPI...`);
     const response = await axios.get('https://serpapi.com/search', {
       params: {
         q: searchQuery,
         engine: 'google',
-        location: location,
         api_key: apiKey,
-        num: 10,
+        num: 20,
+        hl: 'en',
+        gl: 'us',
+        // Add filters to get local businesses
+        safe: 'active',
       },
     });
     
-    const results = response.data.organic_results || [];
-    console.log(`✅ Found ${results.length} real contractors from Google`);
+    console.log('📊 SerpAPI response:', JSON.stringify(response.data).substring(0, 200));
     
-    return results.map((result: any) => ({
-      name: result.title || 'Unknown',
-      website: result.link || result.url,
-      snippet: result.snippet || '',
-    }));
+    const results = response.data.organic_results || [];
+    console.log(`✅ Found ${results.length} results from Google`);
+    
+    if (results.length > 0) {
+      // Filter out generic articles and keep only business websites
+      const businessResults = results
+        .filter((result: any) => {
+          const link = result.link || '';
+          const title = result.title || '';
+          // Skip generic "best of" articles
+          if (title.toLowerCase().includes('best ') || 
+              title.toLowerCase().includes('top ') ||
+              title.toLowerCase().includes('review')) {
+            return false;
+          }
+          // Keep only real business domains
+          return link && !link.includes('best-') && !link.includes('top-');
+        })
+        .slice(0, 15); // Get top 15 business results
+      
+      console.log(`🎯 Found ${businessResults.length} actual business websites`);
+      
+      return businessResults.map((result: any) => ({
+        name: result.title || 'Unknown',
+        website: result.link,
+        snippet: result.snippet || '',
+      }));
+    }
+    
+    // No results from SerpAPI, use mocks
+    console.warn('No results from SerpAPI, using mock data');
+    return getMockContractors(query, location);
   } catch (error: any) {
-    console.error('Google search failed:', error.message);
+    console.error('❌ Google search failed:', error.message);
+    console.error('Error details:', error.response?.data || error);
     return getMockContractors(query, location);
   }
 }
