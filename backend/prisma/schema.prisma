@@ -1,0 +1,186 @@
+// This is your Prisma schema file
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  projects  Project[]
+}
+
+model Project {
+  id             String   @id @default(uuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id])
+  
+  title          String
+  type           String
+  description    String?
+  address        String
+  city           String
+  zip            String?
+  latitude       Float?
+  longitude      Float?
+  radiusKm       Float     @default(25)
+  budgetMax      Float?
+  dateWindow     String?
+  mustHaves      String[]
+  niceToHaves    String[]
+  seedContractors String[]
+  seedContacts   String[]
+  channelsAllowed String[] @default(["email"])
+  autopilot      Boolean  @default(true)
+  quietHours     String?  // "9am-6pm"
+  status         String   @default("draft") // draft, sourcing, awaiting_approval, outreach, negotiating, closed
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  providers      Provider[]
+  events         Event[]
+  
+  @@index([userId])
+}
+
+model Provider {
+  id              String        @id @default(uuid())
+  projectId       String
+  project         Project       @relation(fields: [projectId], references: [id])
+  
+  name            String
+  website         String?
+  ratingSnippet   String?
+  serviceAreaText String?
+  score           Float         @default(0)
+  evidenceUrls    String[]
+  notes           String?
+  
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  
+  contacts        ContactMethod[]
+  threads         Thread[]
+  quotes          Quote[]
+  counterOffers   CounterOffer[]
+  
+  @@index([projectId])
+}
+
+model ContactMethod {
+  id          String   @id @default(uuid())
+  providerId  String
+  provider    Provider @relation(fields: [providerId], references: [id])
+  
+  kind        String   // "email" | "sms" | "phone"
+  value       String
+  sourceUrl   String?
+  confidence  Float    @default(0.5)
+  allowed     Boolean  @default(true)
+  
+  createdAt   DateTime @default(now())
+  
+  @@index([providerId])
+}
+
+model Thread {
+  id            String    @id @default(uuid())
+  providerId    String
+  provider      Provider  @relation(fields: [providerId], references: [id])
+  
+  channel       String    // "email" | "sms"
+  externalIds   String    // JSON object
+  status        String    @default("open") // open, stalled, closed
+  unsubscribe   Boolean   @default(false)
+  lastContactAt DateTime?
+  nextActionAt  DateTime?
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  messages      Message[]
+  
+  @@index([providerId])
+}
+
+model Message {
+  id          String   @id @default(uuid())
+  threadId    String
+  thread      Thread   @relation(fields: [threadId], references: [id])
+  
+  direction   String   // "out" | "in"
+  sender      String
+  subject     String?
+  bodyText    String
+  bodyHtml    String?
+  attachments String[] @default([])
+  timestamp   DateTime @default(now())
+  
+  createdAt   DateTime @default(now())
+  
+  @@index([threadId])
+  @@index([timestamp])
+}
+
+model Quote {
+  id              String   @id @default(uuid())
+  providerId      String
+  provider        Provider @relation(fields: [providerId], references: [id])
+  
+  sourceMessageId String
+  priceType       String?  // "hourly" | "fixed" | "estimate"
+  items           String   // JSON array
+  fees            String   // JSON array
+  taxes           Float?
+  discounts       Float?
+  totalEstimated  Float
+  validUntil      DateTime?
+  leadTimeDays    Int?
+  warrantyTerms   String?
+  notes           String?
+  confidence      Float    @default(0.5)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@index([providerId])
+}
+
+model CounterOffer {
+  id              String    @id @default(uuid())
+  providerId      String
+  provider        Provider  @relation(fields: [providerId], references: [id])
+  
+  sentMessageId   String
+  strategy        String
+  payload         String
+  result          String?  // "accepted" | "declined" | "pending"
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  @@index([providerId])
+}
+
+model Event {
+  id        String   @id @default(uuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id])
+  
+  type      String
+  payload   String  // JSON
+  timestamp DateTime @default(now())
+  
+  @@index([projectId])
+  @@index([timestamp])
+}
